@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"runtime"
 	"time"
+
+	"hash.reksie.com/internal/keys"
 )
 
 func MakeTimedFunction[T any](f T) T {
@@ -18,16 +21,37 @@ func MakeTimedFunction[T any](f T) T {
 
 	//Then MakeFunc call a function and return
 	vf := reflect.ValueOf(f)
-	wrapperF := reflect.MakeFunc(rf, func(in []reflect.Value) []reflect.Value {
+	wrapperF := reflect.MakeFunc(rf, func(fnArgs []reflect.Value) []reflect.Value {
+
+		// Convert arguments to []interface{} for JSON marshaling
+		args := make([]interface{}, len(fnArgs))
+		for i, arg := range fnArgs {
+			args[i] = arg.Interface()
+		}
+
+		// Marshal arguments to JSON
+		jsonArgs, err := json.Marshal(args)
+		if err != nil {
+			fmt.Printf("Error marshaling arguments: %v\n", err)
+		} else {
+			fmt.Printf("Function arguments: %s\n", string(jsonArgs))
+		}
+
+		key, err := keys.HashKey(string(jsonArgs))
+		if err != nil {
+			fmt.Printf("Error hashing arguments: %v\n", err)
+		}
+		fmt.Printf("Function key: %s\n", key)
 
 		//This will get start time of the function call
 		start := time.Now()
 
-		out := vf.Call(in)
+		out := vf.Call(fnArgs)
 
 		//It gets end time of the function call
 		end := time.Now()
 
+		fmt.Printf("Called it with %v\n", fnArgs)
 		//it prints time different between two call
 		fmt.Printf("Calling %s took %v \n", runtime.FuncForPC(vf.Pointer()).Name(), end.Sub(start))
 
