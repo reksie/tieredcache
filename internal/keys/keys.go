@@ -8,6 +8,43 @@ import (
 	"sort"
 )
 
+// HashKey takes any number of parameters and hashes them as a single JSON object.
+func HashKey(data ...interface{}) (string, error) {
+	// Convert the variadic parameters to a slice of interfaces
+	combinedData := make([]interface{}, len(data))
+	copy(combinedData, data)
+
+	// Marshal the combined data to JSON
+	jsonBytes, err := json.Marshal(combinedData)
+	if err != nil {
+		return "", err
+	}
+
+	return string(jsonBytes), nil
+}
+
+// HashKeyMD5 takes any number of parameters and hashes them with MD5.
+func HashKeyMD5(data ...interface{}) (string, error) {
+	combinedData := make([]interface{}, len(data))
+	copy(combinedData, data)
+
+	jsonBytes, err := json.Marshal(combinedData)
+	if err != nil {
+		return "", err
+	}
+
+	hash := md5.New()
+	_, err = hash.Write(jsonBytes)
+	if err != nil {
+		return "", err
+	}
+
+	hashString := hex.EncodeToString(hash.Sum(nil))
+	return hashString, nil
+}
+
+// Some more complex hashing functions
+
 // sortKeys ensures that the keys of maps are sorted in JSON serialization.
 func sortKeys(data interface{}) (interface{}, error) {
 	switch v := data.(type) {
@@ -109,34 +146,6 @@ func HashStructMD5SortedKeys(data interface{}) (string, error) {
 
 	hash := md5.New()
 	_, err = hash.Write(sortedJsonData)
-	if err != nil {
-		return "", err
-	}
-
-	// Convert the hash to a hex string
-	hashString := hex.EncodeToString(hash.Sum(nil))
-	return hashString, nil
-}
-
-// Get a hash key for any data type
-// should be an opaque key
-func HashKey(data interface{}) (string, error) {
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-
-	return string(jsonBytes), nil
-}
-
-func HashKeyMD5(data interface{}) (string, error) {
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-
-	hash := md5.New()
-	_, err = hash.Write(jsonBytes)
 	if err != nil {
 		return "", err
 	}
