@@ -8,14 +8,10 @@ import (
 	"sort"
 )
 
-// HashKey takes any number of parameters and hashes them as a single JSON object.
-func HashKey(data ...interface{}) (string, error) {
-	// Convert the variadic parameters to a slice of interfaces
-	combinedData := make([]interface{}, len(data))
-	copy(combinedData, data)
-
-	// Marshal the combined data to JSON
-	jsonBytes, err := json.Marshal(combinedData)
+// A wrapper around the JSON serialization function for simplicity
+func HashKey(data ...any) (string, error) {
+	// Marshal the data directly to JSON
+	jsonBytes, err := json.Marshal(data)
 	if err != nil {
 		return "", err
 	}
@@ -23,12 +19,9 @@ func HashKey(data ...interface{}) (string, error) {
 	return string(jsonBytes), nil
 }
 
-// HashKeyMD5 takes any number of parameters and hashes them with MD5.
-func HashKeyMD5(data ...interface{}) (string, error) {
-	combinedData := make([]interface{}, len(data))
-	copy(combinedData, data)
-
-	jsonBytes, err := json.Marshal(combinedData)
+// We can MD5 sum it to "compress" the data into a fixed-size string
+func HashKeyMD5(data ...any) (string, error) {
+	jsonBytes, err := json.Marshal(data)
 	if err != nil {
 		return "", err
 	}

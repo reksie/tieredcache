@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"testing"
 )
 
@@ -43,7 +42,6 @@ func TestHashList(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	fmt.Println("yo")
 	// Compare the hash result with the expected value
 	if hash != expected {
 		t.Errorf("expected %s, got %s", expected, hash)

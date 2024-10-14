@@ -128,4 +128,17 @@ func main() {
 
 	fmt.Println(string(jsonBytes))
 
+	const useMd5 = true
+	var hashKey func(data ...any) (string, error)
+	if useMd5 {
+		hashKey = keys.HashKeyMD5
+	} else {
+		hashKey = keys.HashKey
+	}
+
+	key, err := hashKey("string", 123, "another", []string{"one", "two", "three"}, simpleData)
+	if err != nil {
+		log.Fatalf("Failed to hash key: %v", err)
+	}
+	fmt.Println(key)
 }
