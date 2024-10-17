@@ -82,4 +82,24 @@ func main() {
 	timedString := MakeTimedFunction(exampleString)
 	timedString("Hello")
 
+	twoParams := func(x int, y string) (string, error) {
+
+		if x == 5 {
+			return "", fmt.Errorf("error: %d is not allowed", x)
+		}
+
+		fmt.Printf("Two params function called with %d and %s\n", x, y)
+		return y, nil
+	}
+
+	timedTwoParams := MakeTimedFunction(twoParams)
+	value, error := timedTwoParams(5, "Hello")
+	if error != nil {
+		fmt.Println("Oh no!:", error)
+	}
+
+	fmt.Println(value, error)
+
+	timedTwoParams(10, "World")
+
 }
