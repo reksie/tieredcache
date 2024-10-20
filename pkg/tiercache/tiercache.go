@@ -109,7 +109,6 @@ func Swr[R any](opts QueryOptions) (R, error) {
 		opts.Fresh = opts.TieredCache.defaultFresh
 	}
 
-	log.Printf("Swr: Attempting to get key: %s", key)
 	cachedData, err := opts.TieredCache.Get(opts.Context, key)
 	if err == nil && cachedData != nil {
 		cacheMap, ok := cachedData.(map[string]interface{})
