@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sort"
 )
 
@@ -32,6 +31,47 @@ func HashKeyMD5(data ...any) (string, error) {
 		return "", err
 	}
 
+	hashString := hex.EncodeToString(hash.Sum(nil))
+	return hashString, nil
+}
+
+// HashStructMD5 takes any interface (struct or array), serializes it, and returns a stable MD5 hash.
+func HashStructMD5(data interface{}) (string, error) {
+	// Serialize the struct/array into JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+
+	// Create a new MD5 hash
+	hash := md5.New()
+	_, err = hash.Write(jsonData)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the hash to a hex string
+	hashString := hex.EncodeToString(hash.Sum(nil))
+	return hashString, nil
+}
+
+// HashStructMD5SortedKeys takes a struct/array, sorts the JSON keys, and returns a stable MD5 hash.
+func HashStructMD5SortedKeys(data interface{}) (string, error) {
+	// Serialize the struct/array into JSON with sorted keys
+	sortedJsonData, err := marshalWithSortedKeys(data)
+	if err != nil {
+		return "", err
+	}
+
+	// Create an MD5 hash from the sorted JSON data
+
+	hash := md5.New()
+	_, err = hash.Write(sortedJsonData)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the hash to a hex string
 	hashString := hex.EncodeToString(hash.Sum(nil))
 	return hashString, nil
 }
@@ -103,47 +143,4 @@ func marshalWithSortedKeys(data interface{}) ([]byte, error) {
 
 	// Marshal the sorted data back to JSON
 	return json.Marshal(sortedData)
-}
-
-// HashStructMD5 takes any interface (struct or array), serializes it, and returns a stable MD5 hash.
-func HashStructMD5(data interface{}) (string, error) {
-	// Serialize the struct/array into JSON
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-
-	fmt.Println(string(jsonData))
-
-	// Create a new MD5 hash
-	hash := md5.New()
-	_, err = hash.Write(jsonData)
-	if err != nil {
-		return "", err
-	}
-
-	// Convert the hash to a hex string
-	hashString := hex.EncodeToString(hash.Sum(nil))
-	return hashString, nil
-}
-
-// HashStructMD5SortedKeys takes a struct/array, sorts the JSON keys, and returns a stable MD5 hash.
-func HashStructMD5SortedKeys(data interface{}) (string, error) {
-	// Serialize the struct/array into JSON with sorted keys
-	sortedJsonData, err := marshalWithSortedKeys(data)
-	if err != nil {
-		return "", err
-	}
-
-	// Create an MD5 hash from the sorted JSON data
-
-	hash := md5.New()
-	_, err = hash.Write(sortedJsonData)
-	if err != nil {
-		return "", err
-	}
-
-	// Convert the hash to a hex string
-	hashString := hex.EncodeToString(hash.Sum(nil))
-	return hashString, nil
 }
