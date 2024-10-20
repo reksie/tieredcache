@@ -3,6 +3,9 @@ package tiercache
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
+	"reflect"
 	"time"
 
 	"github.com/reksie/memocache/pkg/interfaces"
@@ -20,8 +23,8 @@ type QueryResult struct {
 }
 
 type CacheItem struct {
-	Data      any
-	Timestamp time.Time
+	Data      any       `json:"data"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type TieredCache struct {
@@ -37,8 +40,18 @@ func NewTieredCache(defaultFresh time.Duration, stores ...interfaces.CacheStore)
 }
 
 func (tc *TieredCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+	cacheItem, ok := value.(CacheItem)
+	if !ok {
+		return errors.New("value must be a CacheItem")
+	}
+
+	storeValue := map[string]interface{}{
+		"data":      cacheItem.Data,
+		"timestamp": cacheItem.Timestamp.Format(time.RFC3339Nano),
+	}
+
 	for _, store := range tc.stores {
-		if err := store.Set(ctx, key, value, ttl); err != nil {
+		if err := store.Set(ctx, key, storeValue, ttl); err != nil {
 			return err
 		}
 	}
@@ -81,51 +94,86 @@ func (tc *TieredCache) Close() error {
 	return nil
 }
 
-// We can't make this a method of TieredCache because we'd like the generic type R to be inferred, however we can make a tieredcache any and leave it up to the user to pass in the correct type
-
 func (tc *TieredCache) Swr(ctx context.Context, queryKey any, queryFn func(...any) (any, error), opts QueryOptions) (any, error) {
 	return Swr(ctx, tc, queryKey, queryFn, opts)
 }
 
 func Swr[Props any, R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func(...Props) (R, error), opts QueryOptions) (R, error) {
-
 	var zeroValue R
 
-	key, error := generateKey(queryKey)
-	if error != nil {
-		return zeroValue, error
-	}
-
-	// If Fresh is not set, use the default
-	if opts.Fresh == 0 {
-		opts.Fresh = tc.defaultFresh
-	}
-
-	// Try to get from cache
-
-	cachedData, err := tc.Get(ctx, key)
-	if err == nil {
-		cacheItem := cachedData.(CacheItem)
-		// Data found in cache
-		go func() {
-			// Asynchronously check if data is stale and needs revalidation
-			if time.Since(cacheItem.Timestamp) > opts.Fresh {
-				newData, err := queryFn()
-				if err == nil {
-					tc.Set(ctx, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
-				}
-			}
-		}()
-		return cacheItem.Data.(R), nil
-	}
-
-	// Data not found in cache or error occurred, fetch new data
-	newData, err := queryFn()
+	key, err := generateKey(queryKey)
 	if err != nil {
 		return zeroValue, err
 	}
 
-	// Store new data in cache
+	if opts.Fresh == 0 {
+		opts.Fresh = tc.defaultFresh
+	}
+
+	log.Printf("Swr: Attempting to get key: %s", key)
+	cachedData, err := tc.Get(ctx, key)
+	if err == nil && cachedData != nil {
+		log.Printf("Swr: Found cached data for key: %s, type: %v", key, reflect.TypeOf(cachedData))
+
+		cacheMap, ok := cachedData.(map[string]interface{})
+		if !ok {
+			log.Printf("Swr: Unexpected type for cached data: %T", cachedData)
+			return zeroValue, errors.New("invalid cache item format")
+		}
+
+		log.Printf("Swr: Cache map contents: %+v", cacheMap)
+
+		data, dataOk := cacheMap["data"]
+		timestampStr, timeOk := cacheMap["timestamp"].(string)
+
+		if !dataOk || !timeOk {
+			log.Printf("Swr: Invalid cache item structure. Data ok: %v, Timestamp ok: %v", dataOk, timeOk)
+			return zeroValue, errors.New("invalid cache item structure")
+		}
+
+		timestamp, err := time.Parse(time.RFC3339Nano, timestampStr)
+		if err != nil {
+			log.Printf("Swr: Error parsing timestamp: %v", err)
+			return zeroValue, fmt.Errorf("error parsing timestamp: %v", err)
+		}
+
+		typedData, ok := data.(R)
+		if !ok {
+			log.Printf("Swr: Cannot convert cached data to required type. Expected %T, got %T", zeroValue, data)
+			return zeroValue, errors.New("cannot convert cached data to required type")
+		}
+
+		age := time.Since(timestamp)
+		log.Printf("Swr: Cache item age: %v, Fresh duration: %v", age, opts.Fresh)
+
+		if age <= opts.Fresh {
+			log.Printf("Swr: Returning fresh cached data for key: %s", key)
+			return typedData, nil
+		}
+
+		log.Printf("Swr: Cached data is stale for key: %s, returning stale data and triggering refresh", key)
+		go func() {
+			log.Printf("Swr: Background refresh started for key: %s", key)
+			newData, err := queryFn()
+			if err == nil {
+				log.Printf("Swr: Background refresh successful, updating cache for key: %s", key)
+				tc.Set(ctx, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
+			} else {
+				log.Printf("Swr: Background refresh failed for key: %s, error: %v", key, err)
+			}
+		}()
+
+		return typedData, nil
+	}
+
+	log.Printf("Swr: No valid cached data found for key: %s, fetching new data", key)
+	newData, err := queryFn()
+	if err != nil {
+		log.Printf("Swr: Error fetching new data for key: %s, error: %v", key, err)
+		return zeroValue, err
+	}
+
+	log.Printf("Swr: Successfully fetched new data for key: %s, caching", key)
 	cacheItem := CacheItem{Data: newData, Timestamp: time.Now()}
 	tc.Set(ctx, key, cacheItem, opts.TTL)
 
@@ -133,5 +181,16 @@ func Swr[Props any, R any](ctx context.Context, tc *TieredCache, queryKey any, q
 }
 
 func generateKey(queryKey any) (string, error) {
-	return keys.HashKeyMD5(queryKey)
+	switch v := queryKey.(type) {
+	case string:
+		return keys.HashKeyMD5(v)
+	case []any:
+		key := ""
+		for _, item := range v {
+			key += fmt.Sprintf("%v:", item)
+		}
+		return keys.HashKeyMD5(key)
+	default:
+		return keys.HashKeyMD5(fmt.Sprintf("%v", queryKey))
+	}
 }
