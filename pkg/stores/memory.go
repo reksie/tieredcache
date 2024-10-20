@@ -1,6 +1,7 @@
 package stores
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -30,7 +31,8 @@ func (b *bigCacheStore) Name() string {
 	return b.name
 }
 
-func (b *bigCacheStore) Set(key string, value any, ttl time.Duration) error {
+func (b *bigCacheStore) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
+	// ctx is ignored for BigCache
 	item := cacheItem{
 		Value:     value,
 		ExpiresAt: time.Now().Add(ttl),
@@ -42,7 +44,8 @@ func (b *bigCacheStore) Set(key string, value any, ttl time.Duration) error {
 	return b.cache.Set(key, data)
 }
 
-func (b *bigCacheStore) Get(key string) (any, error) {
+func (b *bigCacheStore) Get(ctx context.Context, key string) (any, error) {
+	// ctx is ignored for BigCache
 	data, err := b.cache.Get(key)
 	if err != nil {
 		if err == bigcache.ErrEntryNotFound {
@@ -65,11 +68,13 @@ func (b *bigCacheStore) Get(key string) (any, error) {
 	return item.Value, nil
 }
 
-func (b *bigCacheStore) Delete(key string) error {
+func (b *bigCacheStore) Delete(ctx context.Context, key string) error {
+	// ctx is ignored for BigCache
 	return b.cache.Delete(key)
 }
 
-func (b *bigCacheStore) Clear() error {
+func (b *bigCacheStore) Clear(ctx context.Context) error {
+	// ctx is ignored for BigCache
 	return b.cache.Reset()
 }
 

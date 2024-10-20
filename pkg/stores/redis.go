@@ -38,9 +38,7 @@ func (r *redisStore) Name() string {
 	return r.name
 }
 
-func (r *redisStore) Set(key string, value any, ttl time.Duration) error {
-	ctx := context.Background()
-
+func (r *redisStore) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
 	if r.config.UseJSONMarshalling {
 		expiresAt := time.Now().Add(ttl)
 		item := redisItem{
@@ -65,8 +63,7 @@ func (r *redisStore) Set(key string, value any, ttl time.Duration) error {
 	return r.client.Set(ctx, key, value, ttl).Err()
 }
 
-func (r *redisStore) Get(key string) (any, error) {
-	ctx := context.Background()
+func (r *redisStore) Get(ctx context.Context, key string) (any, error) {
 	data, err := r.client.Get(ctx, key).Bytes()
 	if err == redis.Nil {
 		return nil, errors.New("key not found in cache")
@@ -100,7 +97,7 @@ func (r *redisStore) Get(key string) (any, error) {
 		}
 
 		if time.Now().After(expiresAt) {
-			r.Delete(key) // Delete expired key
+			r.Delete(ctx, key) // Delete expired key
 			return nil, errors.New("key expired")
 		}
 
@@ -111,13 +108,11 @@ func (r *redisStore) Get(key string) (any, error) {
 	return string(data), nil
 }
 
-func (r *redisStore) Delete(key string) error {
-	ctx := context.Background()
+func (r *redisStore) Delete(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
-func (r *redisStore) Clear() error {
-	ctx := context.Background()
+func (r *redisStore) Clear(ctx context.Context) error {
 	return r.client.FlushDB(ctx).Err()
 }
 
