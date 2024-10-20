@@ -110,10 +110,10 @@ func TestRedisGet(t *testing.T) {
 
 func TestRedisGetExpired(t *testing.T) {
 	store := setupTest(t)
-	err := store.Set("key1", "value1", 10*time.Millisecond)
+	err := store.Set("key1", "value1", 5*time.Millisecond)
 	assert.NoError(t, err)
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	val, err := store.Get("key1")
 	fmt.Println(val)
@@ -122,7 +122,7 @@ func TestRedisGetExpired(t *testing.T) {
 
 func TestRedisDelete(t *testing.T) {
 	store := setupTest(t)
-	err := store.Set("key1", "value1", 60*time.Second)
+	err := store.Set("key1", "value1", 90*time.Second)
 	assert.NoError(t, err)
 
 	err = store.Delete("key1")
@@ -235,10 +235,11 @@ func TestRedisGetExpiredWithJSONMarshallingAndIntegerTTL(t *testing.T) {
 	err := store.Clear()
 	assert.NoError(t, err)
 
-	err = store.Set("key1", "value1", 10*time.Millisecond)
+	// we can use very short millisecond times for ttl because we are using integer for ttl
+	err = store.Set("key1", "value1", 2*time.Millisecond)
 	assert.NoError(t, err)
 
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 
 	_, err = store.Get("key1")
 	assert.Error(t, err)
