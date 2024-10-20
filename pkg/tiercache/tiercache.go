@@ -12,8 +12,12 @@ import (
 )
 
 type QueryOptions struct {
-	Fresh time.Duration
-	TTL   time.Duration
+	Context       context.Context
+	TieredCache   *TieredCache
+	QueryKey      any
+	QueryFunction any // This will be cast to the appropriate type in Swr
+	Fresh         time.Duration
+	TTL           time.Duration
 }
 
 type QueryResult struct {
@@ -93,26 +97,21 @@ func (tc *TieredCache) Close() error {
 	return nil
 }
 
-func (tc *TieredCache) Swr(ctx context.Context, queryKey any, queryFn func() (any, error), opts QueryOptions) (any, error) {
-	return Swr(ctx, tc, queryKey, queryFn, opts)
-}
-
-func Swr[R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func() (R, error), opts QueryOptions) (R, error) {
+func Swr[R any](opts QueryOptions) (R, error) {
 	var zeroValue R
 
-	key, err := generateKey(queryKey)
+	key, err := generateKey(opts.QueryKey)
 	if err != nil {
 		return zeroValue, err
 	}
 
 	if opts.Fresh == 0 {
-		opts.Fresh = tc.defaultFresh
+		opts.Fresh = opts.TieredCache.defaultFresh
 	}
 
 	log.Printf("Swr: Attempting to get key: %s", key)
-	cachedData, err := tc.Get(ctx, key)
+	cachedData, err := opts.TieredCache.Get(opts.Context, key)
 	if err == nil && cachedData != nil {
-
 		cacheMap, ok := cachedData.(map[string]interface{})
 		if !ok {
 			return zeroValue, errors.New("invalid cache item format")
@@ -142,9 +141,14 @@ func Swr[R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func
 		}
 
 		go func() {
+			queryFn, ok := opts.QueryFunction.(func() (R, error))
+			if !ok {
+				log.Printf("Swr: Invalid query function type for key: %s", key)
+				return
+			}
 			newData, err := queryFn()
 			if err == nil {
-				tc.Set(ctx, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
+				opts.TieredCache.Set(opts.Context, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
 			} else {
 				log.Printf("Swr: Background refresh failed for key: %s, error: %v", key, err)
 			}
@@ -153,13 +157,18 @@ func Swr[R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func
 		return typedData, nil
 	}
 
+	queryFn, ok := opts.QueryFunction.(func() (R, error))
+	if !ok {
+		return zeroValue, errors.New("invalid query function type")
+	}
+
 	newData, err := queryFn()
 	if err != nil {
 		return zeroValue, err
 	}
 
 	cacheItem := CacheItem{Data: newData, Timestamp: time.Now()}
-	tc.Set(ctx, key, cacheItem, opts.TTL)
+	opts.TieredCache.Set(opts.Context, key, cacheItem, opts.TTL)
 
 	return newData, nil
 }

@@ -69,12 +69,14 @@ func main() {
 	}
 
 	// First call, should fetch
-
-	result, err := tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn,
-		tiercache.QueryOptions{
-			Fresh: 2 * time.Second,
-			TTL:   10 * time.Second,
-		})
+	result, err := tiercache.Swr[string](tiercache.QueryOptions{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []any{"swr_key", i},
+		QueryFunction: queryFn,
+		Fresh:         2 * time.Second,
+		TTL:           10 * time.Second,
+	})
 	if err != nil {
 		fmt.Printf("Error in SWR: %v\n", err)
 		return
@@ -82,7 +84,14 @@ func main() {
 	fmt.Printf("First call result: %v, Fetch count: %d\n", result, atomic.LoadInt32(&fetchCount))
 
 	// Second call, should use cached value
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 1 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []any{"swr_key", i},
+		QueryFunction: queryFn,
+		Fresh:         1 * time.Second,
+		TTL:           10 * time.Second,
+	})
 	if err != nil {
 		fmt.Printf("Error in second SWR call: %v\n", err)
 		return
@@ -93,7 +102,14 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// Third call, should return stale data and trigger background refresh
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 1 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []any{"swr_key", i},
+		QueryFunction: queryFn,
+		Fresh:         1 * time.Second,
+		TTL:           10 * time.Second,
+	})
 	if err != nil {
 		fmt.Printf("Error in third SWR call: %v\n", err)
 		return
@@ -104,7 +120,14 @@ func main() {
 	time.Sleep(100 * time.Millisecond)
 
 	// Fourth call, should return the newly refreshed data
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []any{"swr_key", i},
+		QueryFunction: queryFn,
+		Fresh:         2 * time.Second,
+		TTL:           10 * time.Second,
+	})
 	if err != nil {
 		fmt.Printf("Error in fourth SWR call: %v\n", err)
 		return

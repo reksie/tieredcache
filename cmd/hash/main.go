@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"hash.reksie.com/internal/keys"
+	"github.com/reksie/memocache/pkg/keys"
 )
 
 func main() {
