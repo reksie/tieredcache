@@ -19,6 +19,8 @@ var (
 	cleanup     func()
 )
 
+const localTest = false
+
 func TestMain(m *testing.M) {
 	// Setup
 	ctx := context.Background()
@@ -43,6 +45,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
+	if localTest {
+		endpoint = "localhost:6379"
+	}
+
+	fmt.Println(endpoint)
+
 	redisClient = redis.NewClient(&redis.Options{
 		Addr: endpoint,
 	})
@@ -64,7 +72,10 @@ func TestMain(m *testing.M) {
 }
 
 func setupTest(t *testing.T) interfaces.CacheStore {
-	store := CreateRedisStore("test_store", redisClient)
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: false,
+		UseIntegerForTTL:   true,
+	})
 	err := store.Clear() // Clear the store before each test
 	assert.NoError(t, err)
 	return store
@@ -83,6 +94,7 @@ func TestRedisSet(t *testing.T) {
 
 func TestRedisGet(t *testing.T) {
 	store := setupTest(t)
+
 	err := store.Set("key1", "value1", 60*time.Second)
 	assert.NoError(t, err)
 

@@ -10,20 +10,27 @@ import (
 	"github.com/reksie/memocache/pkg/interfaces"
 )
 
+type RedisStoreConfig struct {
+	UseJSONMarshalling bool
+	UseIntegerForTTL   bool
+}
+
 type redisStore struct {
 	name   string
 	client *redis.Client
+	config RedisStoreConfig
 }
 
 type redisItem struct {
-	Value     any       `json:"value"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Value     any         `json:"value"`
+	ExpiresAt interface{} `json:"expires_at"`
 }
 
-func CreateRedisStore(name string, client *redis.Client) interfaces.CacheStore {
+func CreateRedisStore(name string, client *redis.Client, config RedisStoreConfig) interfaces.CacheStore {
 	return &redisStore{
 		name:   name,
 		client: client,
+		config: config,
 	}
 }
 
@@ -32,20 +39,30 @@ func (r *redisStore) Name() string {
 }
 
 func (r *redisStore) Set(key string, value any, ttl time.Duration) error {
-
-	// for some reason redis is not using the ttl
-	item := redisItem{
-		Value:     value,
-		ExpiresAt: time.Now().Add(ttl),
-	}
-
-	data, err := json.Marshal(item)
-	if err != nil {
-		return err
-	}
-
 	ctx := context.Background()
-	return r.client.Set(ctx, key, data, ttl).Err() // Note: We're not using Redis TTL here
+
+	if r.config.UseJSONMarshalling {
+		expiresAt := time.Now().Add(ttl)
+		item := redisItem{
+			Value: value,
+		}
+
+		if r.config.UseIntegerForTTL {
+			item.ExpiresAt = expiresAt.Unix()
+		} else {
+			item.ExpiresAt = expiresAt
+		}
+
+		data, err := json.Marshal(item)
+		if err != nil {
+			return err
+		}
+
+		return r.client.Set(ctx, key, data, 0).Err() // No Redis TTL
+	}
+
+	// If not using JSON marshalling, use Redis's built-in TTL
+	return r.client.Set(ctx, key, value, ttl).Err()
 }
 
 func (r *redisStore) Get(key string) (any, error) {
@@ -57,18 +74,41 @@ func (r *redisStore) Get(key string) (any, error) {
 		return nil, err
 	}
 
-	var item redisItem
-	err = json.Unmarshal(data, &item)
-	if err != nil {
-		return nil, err
+	if r.config.UseJSONMarshalling {
+		var item redisItem
+		err = json.Unmarshal(data, &item)
+		if err != nil {
+			return nil, err
+		}
+
+		var expiresAt time.Time
+		if r.config.UseIntegerForTTL {
+			unixTime, ok := item.ExpiresAt.(float64)
+			if !ok {
+				return nil, errors.New("invalid expiration time format")
+			}
+			expiresAt = time.Unix(int64(unixTime), 0)
+		} else {
+			expiresAtStr, ok := item.ExpiresAt.(string)
+			if !ok {
+				return nil, errors.New("invalid expiration time format")
+			}
+			expiresAt, err = time.Parse(time.RFC3339, expiresAtStr)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if time.Now().After(expiresAt) {
+			r.Delete(key) // Delete expired key
+			return nil, errors.New("key expired")
+		}
+
+		return item.Value, nil
 	}
 
-	if time.Now().After(item.ExpiresAt) {
-		r.Delete(key) // Delete expired key
-		return nil, errors.New("key expired")
-	}
-
-	return item.Value, nil
+	// If not using JSON marshalling, return the raw data
+	return string(data), nil
 }
 
 func (r *redisStore) Delete(key string) error {
