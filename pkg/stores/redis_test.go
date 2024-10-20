@@ -11,7 +11,7 @@ import (
 	"github.com/reksie/memocache/pkg/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
-	rediscontainer "github.com/testcontainers/testcontainers-go/modules/redis"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 var (
@@ -22,9 +22,18 @@ var (
 func TestMain(m *testing.M) {
 	// Setup
 	ctx := context.Background()
-	redisContainer, err := rediscontainer.RunContainer(ctx,
-		testcontainers.WithImage("redis:6-alpine"),
-	)
+
+	req := testcontainers.ContainerRequest{
+		Image:        "redis:latest",
+		ExposedPorts: []string{"6379/tcp"},
+		WaitingFor:   wait.ForLog("Ready to accept connections"),
+	}
+
+	redisContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+
 	if err != nil {
 		panic(err)
 	}

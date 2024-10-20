@@ -32,16 +32,20 @@ func (r *redisStore) Name() string {
 }
 
 func (r *redisStore) Set(key string, value any, ttl time.Duration) error {
+
+	// for some reason redis is not using the ttl
 	item := redisItem{
 		Value:     value,
 		ExpiresAt: time.Now().Add(ttl),
 	}
+
 	data, err := json.Marshal(item)
 	if err != nil {
 		return err
 	}
+
 	ctx := context.Background()
-	return r.client.Set(ctx, key, data, 0).Err() // Note: We're not using Redis TTL here
+	return r.client.Set(ctx, key, data, ttl).Err() // Note: We're not using Redis TTL here
 }
 
 func (r *redisStore) Get(key string) (any, error) {
