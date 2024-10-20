@@ -2,11 +2,13 @@ package stores
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/go-test/deep"
 	"github.com/redis/go-redis/v9"
 	"github.com/reksie/memocache/pkg/interfaces"
 	"github.com/stretchr/testify/assert"
@@ -144,6 +146,118 @@ func TestRedisClear(t *testing.T) {
 	_, err2 := store.Get("key2")
 	assert.Error(t, err1)
 	assert.Error(t, err2)
+}
+
+func TestRedisSetGetWithJSONMarshalling(t *testing.T) {
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: true,
+		UseIntegerForTTL:   false,
+	})
+	err := store.Clear()
+	assert.NoError(t, err)
+
+	type TestPerson struct {
+		Name    string   `json:"name"`
+		Age     int      `json:"age"`
+		Hobbies []string `json:"hobbies"`
+	}
+	// Test with a struct
+	testData := TestPerson{
+		Name: "John Doe",
+		Age:  30,
+		Hobbies: []string{
+			"reading",
+			"swimming",
+		},
+	}
+
+	err = store.Set("complex_key", testData, 60*time.Second)
+	assert.NoError(t, err)
+
+	value, err := store.Get("complex_key")
+	assert.NoError(t, err)
+
+	// Convert the returned value to TestPerson
+	var retrievedData TestPerson
+	retrievedDataMap, ok := value.(map[string]interface{})
+	assert.True(t, ok, "Retrieved value should be a map")
+
+	jsonData, err := json.Marshal(retrievedDataMap)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal(jsonData, &retrievedData)
+	assert.NoError(t, err)
+
+	// Use deep.Equal for comparison
+	if diff := deep.Equal(testData, retrievedData); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestRedisSetGetWithJSONMarshallingAndIntegerTTL(t *testing.T) {
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: true,
+		UseIntegerForTTL:   true,
+	})
+	err := store.Clear()
+	assert.NoError(t, err)
+
+	err = store.Set("key1", "value1", 60*time.Second)
+	assert.NoError(t, err)
+
+	value, err := store.Get("key1")
+	assert.NoError(t, err)
+	assert.Equal(t, "value1", value)
+}
+
+func TestRedisGetExpiredWithJSONMarshalling(t *testing.T) {
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: true,
+		UseIntegerForTTL:   false,
+	})
+	err := store.Clear()
+	assert.NoError(t, err)
+
+	err = store.Set("key1", "value1", 10*time.Millisecond)
+	assert.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	_, err = store.Get("key1")
+	assert.Error(t, err)
+}
+
+func TestRedisGetExpiredWithJSONMarshallingAndIntegerTTL(t *testing.T) {
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: true,
+		UseIntegerForTTL:   true,
+	})
+	err := store.Clear()
+	assert.NoError(t, err)
+
+	err = store.Set("key1", "value1", 10*time.Millisecond)
+	assert.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	_, err = store.Get("key1")
+	assert.Error(t, err)
+}
+
+func TestRedisSetGetWithoutJSONMarshalling(t *testing.T) {
+	store := CreateRedisStore("test_store", redisClient, RedisStoreConfig{
+		UseJSONMarshalling: false,
+		UseIntegerForTTL:   false,
+	})
+	err := store.Clear()
+	assert.NoError(t, err)
+
+	err = store.Set("key1", "value1", 60*time.Second)
+	assert.NoError(t, err)
+
+	value, err := store.Get("key1")
+	assert.NoError(t, err)
+	assert.Equal(t, "value1", value)
 }
 
 func TestRedisClose(t *testing.T) {
