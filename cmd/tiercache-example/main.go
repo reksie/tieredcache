@@ -28,7 +28,7 @@ func main() {
 
 	// Basic set and get test
 	fmt.Println("Basic Set and Get Test:")
-	err = cache.Set(ctx, "example_key", tiercache.CacheItem{Data: "example_value", Timestamp: time.Now()}, 5*time.Second)
+	err = cache.Set(ctx, "example_key", tiercache.CacheItem{Data: "example_value", Timestamp: time.Now()}, 100*time.Millisecond)
 	if err != nil {
 		fmt.Printf("Error setting value: %v\n", err)
 		return
@@ -47,7 +47,7 @@ func main() {
 	}
 
 	// Wait for the value to expire
-	time.Sleep(6 * time.Second)
+	time.Sleep(200 * time.Millisecond)
 
 	// Try to get the expired value
 	value, err = cache.Get(ctx, "example_key")
@@ -61,20 +61,20 @@ func main() {
 	fmt.Println("\nSWR Test:")
 	var fetchCount int32
 
-	fetchFn := func(props ...any) (any, error) {
-		atomic.AddInt32(&fetchCount, 1)
-		i := 0
-		if len(props) > 0 {
-			if val, ok := props[0].(int); ok {
-				i = val
-			}
-		}
+	i := 9
+
+	queryFn := func() (string, error) {
+		fetchCount++
 		return fmt.Sprintf("fetched_value_%d_%d", i, atomic.LoadInt32(&fetchCount)), nil
 	}
 
 	// First call, should fetch
-	i := 5
-	result, err := tiercache.Swr(ctx, cache, []any{"swr_key", i}, fetchFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
+
+	result, err := tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn,
+		tiercache.QueryOptions{
+			Fresh: 2 * time.Second,
+			TTL:   10 * time.Second,
+		})
 	if err != nil {
 		fmt.Printf("Error in SWR: %v\n", err)
 		return
@@ -82,7 +82,7 @@ func main() {
 	fmt.Printf("First call result: %v, Fetch count: %d\n", result, atomic.LoadInt32(&fetchCount))
 
 	// Second call, should use cached value
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, fetchFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 1 * time.Second, TTL: 10 * time.Second})
 	if err != nil {
 		fmt.Printf("Error in second SWR call: %v\n", err)
 		return
@@ -90,10 +90,10 @@ func main() {
 	fmt.Printf("Second call result: %v, Fetch count: %d\n", result, atomic.LoadInt32(&fetchCount))
 
 	// Wait for the fresh period to expire
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Third call, should return stale data and trigger background refresh
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, fetchFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 1 * time.Second, TTL: 10 * time.Second})
 	if err != nil {
 		fmt.Printf("Error in third SWR call: %v\n", err)
 		return
@@ -101,10 +101,10 @@ func main() {
 	fmt.Printf("Third call result: %v, Fetch count: %d\n", result, atomic.LoadInt32(&fetchCount))
 
 	// Wait for background refresh to complete
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	// Fourth call, should return the newly refreshed data
-	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, fetchFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
+	result, err = tiercache.Swr(ctx, cache, []any{"swr_key", i}, queryFn, tiercache.QueryOptions{Fresh: 2 * time.Second, TTL: 10 * time.Second})
 	if err != nil {
 		fmt.Printf("Error in fourth SWR call: %v\n", err)
 		return

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"reflect"
 	"time"
 
 	"github.com/reksie/memocache/pkg/interfaces"
@@ -94,11 +93,11 @@ func (tc *TieredCache) Close() error {
 	return nil
 }
 
-func (tc *TieredCache) Swr(ctx context.Context, queryKey any, queryFn func(...any) (any, error), opts QueryOptions) (any, error) {
+func (tc *TieredCache) Swr(ctx context.Context, queryKey any, queryFn func() (any, error), opts QueryOptions) (any, error) {
 	return Swr(ctx, tc, queryKey, queryFn, opts)
 }
 
-func Swr[Props any, R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func(...Props) (R, error), opts QueryOptions) (R, error) {
+func Swr[R any](ctx context.Context, tc *TieredCache, queryKey any, queryFn func() (R, error), opts QueryOptions) (R, error) {
 	var zeroValue R
 
 	key, err := generateKey(queryKey)
@@ -113,50 +112,38 @@ func Swr[Props any, R any](ctx context.Context, tc *TieredCache, queryKey any, q
 	log.Printf("Swr: Attempting to get key: %s", key)
 	cachedData, err := tc.Get(ctx, key)
 	if err == nil && cachedData != nil {
-		log.Printf("Swr: Found cached data for key: %s, type: %v", key, reflect.TypeOf(cachedData))
 
 		cacheMap, ok := cachedData.(map[string]interface{})
 		if !ok {
-			log.Printf("Swr: Unexpected type for cached data: %T", cachedData)
 			return zeroValue, errors.New("invalid cache item format")
 		}
-
-		log.Printf("Swr: Cache map contents: %+v", cacheMap)
 
 		data, dataOk := cacheMap["data"]
 		timestampStr, timeOk := cacheMap["timestamp"].(string)
 
 		if !dataOk || !timeOk {
-			log.Printf("Swr: Invalid cache item structure. Data ok: %v, Timestamp ok: %v", dataOk, timeOk)
 			return zeroValue, errors.New("invalid cache item structure")
 		}
 
 		timestamp, err := time.Parse(time.RFC3339Nano, timestampStr)
 		if err != nil {
-			log.Printf("Swr: Error parsing timestamp: %v", err)
 			return zeroValue, fmt.Errorf("error parsing timestamp: %v", err)
 		}
 
 		typedData, ok := data.(R)
 		if !ok {
-			log.Printf("Swr: Cannot convert cached data to required type. Expected %T, got %T", zeroValue, data)
 			return zeroValue, errors.New("cannot convert cached data to required type")
 		}
 
 		age := time.Since(timestamp)
-		log.Printf("Swr: Cache item age: %v, Fresh duration: %v", age, opts.Fresh)
 
 		if age <= opts.Fresh {
-			log.Printf("Swr: Returning fresh cached data for key: %s", key)
 			return typedData, nil
 		}
 
-		log.Printf("Swr: Cached data is stale for key: %s, returning stale data and triggering refresh", key)
 		go func() {
-			log.Printf("Swr: Background refresh started for key: %s", key)
 			newData, err := queryFn()
 			if err == nil {
-				log.Printf("Swr: Background refresh successful, updating cache for key: %s", key)
 				tc.Set(ctx, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
 			} else {
 				log.Printf("Swr: Background refresh failed for key: %s, error: %v", key, err)
@@ -166,14 +153,11 @@ func Swr[Props any, R any](ctx context.Context, tc *TieredCache, queryKey any, q
 		return typedData, nil
 	}
 
-	log.Printf("Swr: No valid cached data found for key: %s, fetching new data", key)
 	newData, err := queryFn()
 	if err != nil {
-		log.Printf("Swr: Error fetching new data for key: %s, error: %v", key, err)
 		return zeroValue, err
 	}
 
-	log.Printf("Swr: Successfully fetched new data for key: %s, caching", key)
 	cacheItem := CacheItem{Data: newData, Timestamp: time.Now()}
 	tc.Set(ctx, key, cacheItem, opts.TTL)
 
