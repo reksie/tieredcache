@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -25,7 +26,10 @@ const localTest = false
 
 func TestMain(m *testing.M) {
 	// Setup
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	log.Println("Setting up test environment...")
 
 	req := testcontainers.ContainerRequest{
 		Image:        "redis:latest",
@@ -39,36 +43,33 @@ func TestMain(m *testing.M) {
 	})
 
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to start Redis container: %v", err)
 	}
 
 	endpoint, err := redisContainer.Endpoint(ctx, "")
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to get Redis endpoint: %v", err)
 	}
 
 	if localTest {
 		endpoint = "localhost:6379"
 	}
 
-	fmt.Println(endpoint)
+	log.Printf("Redis endpoint: %s", endpoint)
 
 	redisClient = redis.NewClient(&redis.Options{
 		Addr: endpoint,
 	})
 
-	cleanup = func() {
-		redisClient.Close()
-		if err := redisContainer.Terminate(ctx); err != nil {
-			panic(err)
-		}
-	}
-
 	// Run tests
 	code := m.Run()
 
 	// Teardown
-	cleanup()
+	log.Println("Cleaning up test environment...")
+	redisClient.Close()
+	if err := redisContainer.Terminate(ctx); err != nil {
+		log.Printf("Failed to terminate Redis container: %v", err)
+	}
 
 	os.Exit(code)
 }
