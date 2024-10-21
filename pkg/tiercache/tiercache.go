@@ -105,6 +105,7 @@ func Swr[R any](opts QueryOptions) (R, error) {
 		return zeroValue, err
 	}
 
+	fmt.Printf("Key: %s\n", key)
 	if opts.Fresh == 0 {
 		opts.Fresh = opts.TieredCache.defaultFresh
 	}
@@ -173,16 +174,20 @@ func Swr[R any](opts QueryOptions) (R, error) {
 }
 
 func generateKey(queryKey any) (string, error) {
+
+	// keys.HashKeyMD5
+	hashFunction := keys.HashKeyJson
+
 	switch v := queryKey.(type) {
 	case string:
-		return keys.HashKeyMD5(v)
+		return hashFunction(v)
 	case []any:
 		key := ""
 		for _, item := range v {
 			key += fmt.Sprintf("%v:", item)
 		}
-		return keys.HashKeyMD5(key)
+		return hashFunction(key)
 	default:
-		return keys.HashKeyMD5(fmt.Sprintf("%v", queryKey))
+		return hashFunction(fmt.Sprintf("%v", queryKey))
 	}
 }

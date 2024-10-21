@@ -136,7 +136,7 @@ func main() {
 		hashKey = keys.HashKey
 	}
 
-	key, err := hashKey("string", 123, "another", []string{"one", "two", "three"}, simpleData)
+	key, err := HashKeyJson("string", 123, "another", []string{"one", "two", "three"}, simpleData)
 	if err != nil {
 		log.Fatalf("Failed to hash key: %v", err)
 	}

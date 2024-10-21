@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"github.com/allegro/bigcache/v3"
+	"github.com/reksie/memocache/pkg/keys"
 	"github.com/reksie/memocache/pkg/stores"
 	"github.com/reksie/memocache/pkg/tiercache"
 )
@@ -118,6 +120,36 @@ func main() {
 
 	// Wait for background refresh to complete
 	time.Sleep(100 * time.Millisecond)
+
+	type SomeParams struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+	someParams := SomeParams{Name: "John", Age: 30}
+
+	stringified, err := json.Marshal(someParams)
+	if err != nil {
+		fmt.Printf("Error marshalling: %v\n", err)
+		return
+	}
+	fmt.Println(string(stringified))
+
+	key, err := keys.HashKeyMD5(someParams)
+	if err != nil {
+		fmt.Printf("Error hashing key: %v\n", err)
+		return
+	}
+
+	fmt.Println(string(stringified))
+	// Fourth call, should return the newly refreshed data
+	tiercache.Swr[string](tiercache.QueryOptions{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []string{"examplePrefix", key},
+		QueryFunction: queryFn,
+		Fresh:         2 * time.Second,
+		TTL:           5 * time.Minute,
+	})
 
 	// Fourth call, should return the newly refreshed data
 	result, err = tiercache.Swr[string](tiercache.QueryOptions{

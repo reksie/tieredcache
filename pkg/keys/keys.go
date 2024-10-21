@@ -8,7 +8,7 @@ import (
 )
 
 // A wrapper around the JSON serialization function for simplicity
-func HashKey(data ...any) (string, error) {
+func HashKeyJson(data ...any) (string, error) {
 	// Marshal the data directly to JSON
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {

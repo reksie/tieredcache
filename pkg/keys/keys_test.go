@@ -8,7 +8,7 @@ import (
 )
 
 // Test HashKey with multiple arguments
-func TestHashKey(t *testing.T) {
+func TestHashKeyJson(t *testing.T) {
 	// Test with multiple data types
 	data := []interface{}{"string", 123, "another", []string{"one", "two", "three"}}
 
@@ -17,7 +17,7 @@ func TestHashKey(t *testing.T) {
 	expected := string(expectedBytes)
 
 	// Test the HashKey function
-	hash, err := HashKey("string", 123, "another", []string{"one", "two", "three"})
+	hash, err := HashKeyJson("string", 123, "another", []string{"one", "two", "three"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -37,7 +37,7 @@ func TestHashList(t *testing.T) {
 	expected := string(expectedBytes)
 
 	// Test the HashKey function
-	hash, err := HashKey("string", 123, "another", []string{"one", "two", "three"})
+	hash, err := HashKeyJson("string", 123, "another", []string{"one", "two", "three"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

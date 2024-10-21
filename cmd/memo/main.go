@@ -37,7 +37,7 @@ func MakeTimedFunction[T any](f T) T {
 			fmt.Printf("Function arguments: %s\n", string(jsonArgs))
 		}
 
-		key, err := keys.HashKey(string(jsonArgs))
+		key, err := keys.HashKeyJson(string(jsonArgs))
 		if err != nil {
 			fmt.Printf("Error hashing arguments: %v\n", err)
 		}
