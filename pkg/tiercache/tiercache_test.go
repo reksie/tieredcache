@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache/v3"
-	"github.com/reksie/memocache/pkg/interfaces"
-	"github.com/reksie/memocache/pkg/stores"
+	"github.com/reksie/tieredcache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/stores"
 	"github.com/stretchr/testify/assert"
 )
 

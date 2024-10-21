@@ -1,4 +1,4 @@
-package memocache
+package tieredcache
 
 type Cache struct {
 }

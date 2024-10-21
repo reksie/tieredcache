@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-test/deep"
 	"github.com/redis/go-redis/v9"
-	"github.com/reksie/memocache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"

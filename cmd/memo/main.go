@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/reksie/memocache/pkg/keys"
+	"github.com/reksie/tieredcache/pkg/keys"
 )
 
 func MakeTimedFunction[T any](f T) T {

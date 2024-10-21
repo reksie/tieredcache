@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache/v3"
-	"github.com/reksie/memocache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/interfaces"
 )
 
 type bigCacheStore struct {

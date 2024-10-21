@@ -1,4 +1,4 @@
-module github.com/reksie/memocache
+module github.com/reksie/tieredcache
 
 go 1.23.1
 

@@ -9,10 +9,10 @@ import (
 
 	"github.com/allegro/bigcache/v3"
 	"github.com/redis/go-redis/v9"
-	"github.com/reksie/memocache/pkg/interfaces"
-	"github.com/reksie/memocache/pkg/keys"
-	"github.com/reksie/memocache/pkg/stores"
-	"github.com/reksie/memocache/pkg/tiercache"
+	"github.com/reksie/tieredcache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/keys"
+	"github.com/reksie/tieredcache/pkg/stores"
+	"github.com/reksie/tieredcache/pkg/tiercache"
 )
 
 func main() {

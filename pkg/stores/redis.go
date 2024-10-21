@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/reksie/memocache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/interfaces"
 )
 
 type RedisStoreConfig struct {
@@ -71,41 +71,42 @@ func (r *redisStore) Get(ctx context.Context, key string) (any, error) {
 		return nil, err
 	}
 
-	if r.config.UseJSONMarshalling {
-		var item redisItem
-		err = json.Unmarshal(data, &item)
+	if !r.config.UseJSONMarshalling {
+		// If not using JSON marshalling, return the raw data
+		return string(data), nil
+	}
+
+	var item redisItem
+	err = json.Unmarshal(data, &item)
+	if err != nil {
+		return nil, err
+	}
+
+	var expiresAt time.Time
+	if r.config.UseIntegerForTTL {
+		unixTime, ok := item.ExpiresAt.(float64)
+		if !ok {
+			return nil, errors.New("invalid expiration time format")
+		}
+		expiresAt = time.Unix(int64(unixTime), 0)
+	} else {
+		expiresAtStr, ok := item.ExpiresAt.(string)
+		if !ok {
+			return nil, errors.New("invalid expiration time format")
+		}
+		expiresAt, err = time.Parse(time.RFC3339, expiresAtStr)
 		if err != nil {
 			return nil, err
 		}
-
-		var expiresAt time.Time
-		if r.config.UseIntegerForTTL {
-			unixTime, ok := item.ExpiresAt.(float64)
-			if !ok {
-				return nil, errors.New("invalid expiration time format")
-			}
-			expiresAt = time.Unix(int64(unixTime), 0)
-		} else {
-			expiresAtStr, ok := item.ExpiresAt.(string)
-			if !ok {
-				return nil, errors.New("invalid expiration time format")
-			}
-			expiresAt, err = time.Parse(time.RFC3339, expiresAtStr)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if time.Now().After(expiresAt) {
-			r.Delete(ctx, key) // Delete expired key
-			return nil, errors.New("key expired")
-		}
-
-		return item.Value, nil
 	}
 
-	// If not using JSON marshalling, return the raw data
-	return string(data), nil
+	if time.Now().After(expiresAt) {
+		r.Delete(ctx, key) // Delete expired key
+		return nil, errors.New("key expired")
+	}
+
+	return item.Value, nil
+
 }
 
 func (r *redisStore) Delete(ctx context.Context, key string) error {

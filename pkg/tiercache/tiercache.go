@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/reksie/memocache/pkg/interfaces"
-	"github.com/reksie/memocache/pkg/keys"
+	"github.com/reksie/tieredcache/pkg/interfaces"
+	"github.com/reksie/tieredcache/pkg/keys"
 )
 
 type QueryOptions struct {
