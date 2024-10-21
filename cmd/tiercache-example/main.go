@@ -8,12 +8,17 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache/v3"
+	"github.com/redis/go-redis/v9"
+	"github.com/reksie/memocache/pkg/interfaces"
 	"github.com/reksie/memocache/pkg/keys"
 	"github.com/reksie/memocache/pkg/stores"
 	"github.com/reksie/memocache/pkg/tiercache"
 )
 
 func main() {
+
+	ctx := context.Background()
+
 	// Create a BigCache instance
 	bigcacheConfig := bigcache.DefaultConfig(10 * time.Minute)
 	bigcacheInstance, err := bigcache.New(context.Background(), bigcacheConfig)
@@ -24,9 +29,19 @@ func main() {
 
 	// Create a new tiercache with a memory store
 	memoryStore := stores.CreateMemoryStore("memory", bigcacheInstance)
-	cache := tiercache.NewTieredCache(5*time.Second, memoryStore)
 
-	ctx := context.Background()
+	// setup the redis cache
+
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+
+	redisStore := stores.CreateRedisStore("test_store", redisClient, stores.RedisStoreConfig{
+		UseJSONMarshalling: true,
+		UseIntegerForTTL:   true,
+	})
+
+	cache := tiercache.NewTieredCache(5*time.Second, []interfaces.CacheStore{memoryStore, redisStore})
 
 	// Basic set and get test
 	fmt.Println("Basic Set and Get Test:")

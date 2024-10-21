@@ -27,7 +27,7 @@ type QueryResult struct {
 
 type CacheItem struct {
 	Data      any       `json:"data"`
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time `json:"timestamp"` // maybe more optimal to store as Unix timestamp
 }
 
 type TieredCache struct {
@@ -35,7 +35,7 @@ type TieredCache struct {
 	defaultFresh time.Duration
 }
 
-func NewTieredCache(defaultFresh time.Duration, stores ...interfaces.CacheStore) *TieredCache {
+func NewTieredCache(defaultFresh time.Duration, stores []interfaces.CacheStore) *TieredCache {
 	return &TieredCache{
 		stores:       stores,
 		defaultFresh: defaultFresh,

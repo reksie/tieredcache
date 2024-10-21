@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache/v3"
+	"github.com/reksie/memocache/pkg/interfaces"
 	"github.com/reksie/memocache/pkg/stores"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,11 +17,13 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	// Set up the cache
+
+	// Set up the memory cache
 	bigcacheConfig := bigcache.DefaultConfig(10 * time.Minute)
 	bigcacheInstance, _ := bigcache.New(context.Background(), bigcacheConfig)
 	memoryStore := stores.CreateMemoryStore("memory", bigcacheInstance)
-	cache = NewTieredCache(5*time.Second, memoryStore)
+
+	cache = NewTieredCache(5*time.Second, []interfaces.CacheStore{memoryStore})
 	ctx = context.Background()
 
 	// Run the tests
