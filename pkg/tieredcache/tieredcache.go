@@ -1,4 +1,4 @@
-package tiercache
+package tieredcache
 
 import (
 	"context"
@@ -11,11 +11,13 @@ import (
 	"github.com/reksie/tieredcache/pkg/keys"
 )
 
-type QueryOptions struct {
+type QueryFunction[R any] func() (R, error)
+
+type QueryOptions[R any] struct {
 	Context       context.Context
 	TieredCache   *TieredCache
 	QueryKey      any
-	QueryFunction any // This will be cast to the appropriate type in Swr
+	QueryFunction QueryFunction[R]
 	Fresh         time.Duration
 	TTL           time.Duration
 }
@@ -97,7 +99,7 @@ func (tc *TieredCache) Close() error {
 	return nil
 }
 
-func Swr[R any](opts QueryOptions) (R, error) {
+func Swr[R any](opts QueryOptions[R]) (R, error) {
 	var zeroValue R
 
 	key, err := generateKey(opts.QueryKey)
@@ -105,7 +107,6 @@ func Swr[R any](opts QueryOptions) (R, error) {
 		return zeroValue, err
 	}
 
-	fmt.Printf("Key: %s\n", key)
 	if opts.Fresh == 0 {
 		opts.Fresh = opts.TieredCache.defaultFresh
 	}
@@ -141,12 +142,8 @@ func Swr[R any](opts QueryOptions) (R, error) {
 		}
 
 		go func() {
-			queryFn, ok := opts.QueryFunction.(func() (R, error))
-			if !ok {
-				log.Printf("Swr: Invalid query function type for key: %s", key)
-				return
-			}
-			newData, err := queryFn()
+
+			newData, err := opts.QueryFunction()
 			if err == nil {
 				opts.TieredCache.Set(opts.Context, key, CacheItem{Data: newData, Timestamp: time.Now()}, opts.TTL)
 			} else {
@@ -157,12 +154,7 @@ func Swr[R any](opts QueryOptions) (R, error) {
 		return typedData, nil
 	}
 
-	queryFn, ok := opts.QueryFunction.(func() (R, error))
-	if !ok {
-		return zeroValue, errors.New("invalid query function type")
-	}
-
-	newData, err := queryFn()
+	newData, err := opts.QueryFunction()
 	if err != nil {
 		return zeroValue, err
 	}

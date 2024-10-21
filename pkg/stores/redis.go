@@ -56,7 +56,7 @@ func (r *redisStore) Set(ctx context.Context, key string, value any, ttl time.Du
 			return err
 		}
 
-		return r.client.Set(ctx, key, data, 0).Err() // No Redis TTL
+		return r.client.Set(ctx, key, data, ttl).Err()
 	}
 
 	// If not using JSON marshalling, use Redis's built-in TTL

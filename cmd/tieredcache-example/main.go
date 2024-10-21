@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -12,7 +11,7 @@ import (
 	"github.com/reksie/tieredcache/pkg/interfaces"
 	"github.com/reksie/tieredcache/pkg/keys"
 	"github.com/reksie/tieredcache/pkg/stores"
-	"github.com/reksie/tieredcache/pkg/tiercache"
+	"github.com/reksie/tieredcache/pkg/tieredcache"
 )
 
 func main() {
@@ -36,16 +35,52 @@ func main() {
 		Addr: "localhost:6379",
 	})
 
-	redisStore := stores.CreateRedisStore("test_store", redisClient, stores.RedisStoreConfig{
+	redisStore := stores.CreateRedisStore("redis", redisClient, stores.RedisStoreConfig{
 		UseJSONMarshalling: true,
 		UseIntegerForTTL:   true,
 	})
 
-	cache := tiercache.NewTieredCache(5*time.Second, []interfaces.CacheStore{memoryStore, redisStore})
+	cache := tieredcache.NewTieredCache(5*time.Second, []interfaces.CacheStore{memoryStore, redisStore})
+
+	type ExampleParams struct {
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+	exampleParams := ExampleParams{Name: "John", Age: 30}
+
+	key, err := keys.HashKeyMD5(exampleParams)
+	if err != nil {
+		fmt.Printf("Error hashing key: %v\n", err)
+		return
+	}
+
+	// Then use the Swr
+	var fetchCount int32
+	i := 9
+
+	queryFn := func() (string, error) {
+		fetchCount++
+		return fmt.Sprintf("fetched_value_%d_%d", i, atomic.LoadInt32(&fetchCount)), nil
+	}
+
+	// Building own query key
+	result, err := tieredcache.Swr[string](tieredcache.QueryOptions[string]{
+		Context:       ctx,
+		TieredCache:   cache,
+		QueryKey:      []string{"examplePrefix", key},
+		QueryFunction: queryFn,
+		Fresh:         2 * time.Second,
+		TTL:           5 * time.Minute,
+	})
+	if err != nil {
+		fmt.Printf("Error in SWR: %v\n", err)
+	}
+
+	fmt.Printf("First call result: %v\n", result)
 
 	// Basic set and get test
 	fmt.Println("Basic Set and Get Test:")
-	err = cache.Set(ctx, "example_key", tiercache.CacheItem{Data: "example_value", Timestamp: time.Now()}, 100*time.Millisecond)
+	err = cache.Set(ctx, "example_key", tieredcache.CacheItem{Data: "example_value", Timestamp: time.Now()}, 100*time.Millisecond)
 	if err != nil {
 		fmt.Printf("Error setting value: %v\n", err)
 		return
@@ -76,17 +111,9 @@ func main() {
 
 	// SWR Test
 	fmt.Println("\nSWR Test:")
-	var fetchCount int32
-
-	i := 9
-
-	queryFn := func() (string, error) {
-		fetchCount++
-		return fmt.Sprintf("fetched_value_%d_%d", i, atomic.LoadInt32(&fetchCount)), nil
-	}
 
 	// First call, should fetch
-	result, err := tiercache.Swr[string](tiercache.QueryOptions{
+	result, err = tieredcache.Swr[string](tieredcache.QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key", i},
@@ -101,7 +128,7 @@ func main() {
 	fmt.Printf("First call result: %v, Fetch count: %d\n", result, atomic.LoadInt32(&fetchCount))
 
 	// Second call, should use cached value
-	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+	result, err = tieredcache.Swr[string](tieredcache.QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key", i},
@@ -119,7 +146,7 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// Third call, should return stale data and trigger background refresh
-	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+	result, err = tieredcache.Swr[string](tieredcache.QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key", i},
@@ -136,38 +163,8 @@ func main() {
 	// Wait for background refresh to complete
 	time.Sleep(100 * time.Millisecond)
 
-	type SomeParams struct {
-		Name string `json:"name"`
-		Age  int    `json:"age"`
-	}
-	someParams := SomeParams{Name: "John", Age: 30}
-
-	stringified, err := json.Marshal(someParams)
-	if err != nil {
-		fmt.Printf("Error marshalling: %v\n", err)
-		return
-	}
-	fmt.Println(string(stringified))
-
-	key, err := keys.HashKeyMD5(someParams)
-	if err != nil {
-		fmt.Printf("Error hashing key: %v\n", err)
-		return
-	}
-
-	fmt.Println(string(stringified))
 	// Fourth call, should return the newly refreshed data
-	tiercache.Swr[string](tiercache.QueryOptions{
-		Context:       ctx,
-		TieredCache:   cache,
-		QueryKey:      []string{"examplePrefix", key},
-		QueryFunction: queryFn,
-		Fresh:         2 * time.Second,
-		TTL:           5 * time.Minute,
-	})
-
-	// Fourth call, should return the newly refreshed data
-	result, err = tiercache.Swr[string](tiercache.QueryOptions{
+	result, err = tieredcache.Swr[string](tieredcache.QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key", i},

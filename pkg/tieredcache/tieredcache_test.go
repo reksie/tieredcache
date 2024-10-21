@@ -1,4 +1,4 @@
-package tiercache
+package tieredcache
 
 import (
 	"context"
@@ -71,7 +71,7 @@ func TestSWR(t *testing.T) {
 	}
 
 	// First call, should fetch
-	result, err := Swr[string](QueryOptions{
+	result, err := Swr[string](QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key"},
@@ -85,7 +85,7 @@ func TestSWR(t *testing.T) {
 	assert.Equal(t, 1, fetchCount)
 
 	// Second call, should use cached value
-	result, err = Swr[string](QueryOptions{
+	result, err = Swr[string](QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key"},
@@ -102,7 +102,7 @@ func TestSWR(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Third call, should return stale data and trigger background refresh
-	result, err = Swr[string](QueryOptions{
+	result, err = Swr[string](QueryOptions[string]{
 		Context:       ctx,
 		TieredCache:   cache,
 		QueryKey:      []any{"swr_key"},

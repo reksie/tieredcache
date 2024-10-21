@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-// Memoize takes a function with any number of arguments and returns a memoized version of that function
+// Memoize takes a function with any number of arguments and returns a naive memoized version of that function
 func Memoize(f interface{}) interface{} {
 	ft := reflect.TypeOf(f)
 	if ft.Kind() != reflect.Func {
