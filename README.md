@@ -63,7 +63,7 @@ func main() {
 	}
 	exampleParams := ExampleParams{Name: "John", Age: 30}
 
-	key, err := keys.HashKeyMD5(exampleParams)
+	key, err := keys.HashKeyMD5(exampleParams) // or keys.HashKeyJSON(exampleParams)
 	if err != nil {
 		fmt.Printf("Error hashing key: %v\n", err)
 		return
